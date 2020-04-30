@@ -12,7 +12,7 @@ import time
 import logging
 import logging.handlers
 from yahoo_fin import stock_info as si
-from alpha_vantage import timeseries as ti_s
+from alpha_vantage import timeseries as tsi
 import matplotlib.pyplot as plt
 from datetime import datetime
 from news_reader import process_prediction
@@ -33,9 +33,9 @@ handler.setFormatter(formatter)
 my_logger.addHandler(handler)
 
 
-initial_cash = 1000
+initial_cash = 10000
 n_pick = 5
-api_key = '4REECBOFJ49S87CD'
+api_key = 'M732SN6UCXRGLSYM'
 api_wait_time = 80
 
 stock_signals = {'buy': {}, 'sell': {}}
@@ -46,7 +46,9 @@ today = datetime.today()
 market_start_time = str(datetime(year=today.year, month=today.month, day=today.day, hour=9, minute=30))
 market_end_time = str(datetime(year=today.year, month=today.month, day=today.day, hour=15, minute=30))
 
-market_start_time = '2020-04-28 00:00:00'
+market_start_time = '2020-04-30 00:00:00'
+
+market_end_time = '2020-04-30 13:00:00'
 
 
 def get_day_stocks(limit=5):
@@ -124,13 +126,7 @@ def buy_specific_stock(portfolio, stock_data):
             portfolio['positions'][i]['nbr_part'] = stock_data['nbr_part']
     
     
-    market_actions['buy'].append(stock_data)
-#    if 'buy' in portfolio:
-#        portfolio['buy'] = portfolio['buy'].append(stock_data)
-#    else:
-#        portfolio['buy'] = [stock_data]
-    
-    
+    market_actions['buy'].append(stock_data)    
     my_logger.info('buy {}'.format(stock_data))
     my_logger.info('portfolio {}'.format(portfolio))
     
@@ -156,12 +152,6 @@ def sel_specific_stock(portfolio, stock_data):
             portfolio['positions'][i]['nbr_part'] = 0
     
     market_actions['sell'].append(stock_data)
-#    if 'sell' in portfolio:
-#        print(portfolio['sell'], type(portfolio['sell']))
-#        portfolio['sell'] = portfolio['sell'].append(stock_data)
-#    else:
-#        portfolio['sell'] = [stock_data]
-    
     return portfolio
 
 
@@ -195,94 +185,96 @@ def get_nlp_prediction(symbol):
 def run_strategy(portfolio, nlp_enabled=True):
     """
     Goal: run our strategy at a trading moment
-    """
-    ts = ti_s.TimeSeries(key=api_key, output_format='pandas')
+    """    
     for item in portfolio['positions']:
         symbol = item['Symbol']
         print('stock: ', symbol)
-        data, meta_data = ts.get_intraday(symbol=symbol,interval='1min', outputsize='full')
-        data = data[data.index >= market_start_time]
-        
-        # plots
-        if len(data) > 0:
-            plt.figure()
-            data['4. close'].plot()
-            plt.title('Intraday Times Series for the {} stock (1 min)'.format(symbol))
-            plt.show()
-        
-        # Generate moving averages
-        data = data.reindex(index=data.index[::-1]) # Reverse for the moving average computation
-        data['Mavg5'] = data['4. close'].rolling(window=5).mean()
-        data['Mavg20'] = data['4. close'].rolling(window=20).mean()
-        
-        # Save moving averages for the day before
-        prev_short_mavg = data['Mavg5'].shift(1)
-        prev_long_mavg = data['Mavg20'].shift(1)
-        
-        # Select buying and selling signals: where moving averages cross
-        buys = data.ix[(data['Mavg5'] <= data['Mavg20']) & (prev_short_mavg >= prev_long_mavg)]
-        buys['key'] = buys.index
-        sells = data.ix[(data['Mavg5'] >= data['Mavg20']) & (prev_short_mavg <= prev_long_mavg)]
-        sells['key'] = sells.index
-        
-        # decide to sell or buy
-        # 1- sellprocess
-        sells_actions = sells.to_dict('records')
-        for action in sells_actions:
-            key = str(action['key'])+'_'+symbol
-            if key in stock_signals['sell']:
-                pass
-            else:
-                stock_data = get_stock_updated_data(symbol, portfolio)
-                if nlp_enabled:
-                    prediton_value = get_nlp_prediction(symbol)
-                    if prediton_value == 0:
+        try:
+            ts = tsi.TimeSeries(key=api_key, output_format='pandas')
+            data, meta_data = ts.get_intraday(symbol=symbol,interval='1min', outputsize='full')
+            data = data[data.index >= market_start_time]
+            # plots
+            if len(data) > 0:
+                plt.figure()
+                data['4. close'].plot()
+                plt.title('Intraday Times Series for the {} stock (1 min)'.format(symbol))
+                plt.show()
+                        
+            # Generate moving averages
+            data = data.reindex(index=data.index[::-1]) # Reverse for the moving average computation
+            data['Mavg5'] = data['4. close'].rolling(window=5).mean()
+            data['Mavg20'] = data['4. close'].rolling(window=20).mean()
+            
+            # Save moving averages for the day before
+            prev_short_mavg = data['Mavg5'].shift(1)
+            prev_long_mavg = data['Mavg20'].shift(1)
+            
+            # Select buying and selling signals: where moving averages cross
+            buys = data.ix[(data['Mavg5'] <= data['Mavg20']) & (prev_short_mavg >= prev_long_mavg)]
+            buys['key'] = buys.index
+            sells = data.ix[(data['Mavg5'] >= data['Mavg20']) & (prev_short_mavg <= prev_long_mavg)]
+            sells['key'] = sells.index
+            
+            # decide to sell or buy
+            # 1- sellprocess
+            sells_actions = sells.to_dict('records')
+            for action in sells_actions:
+                key = str(action['key'])+'_'+symbol
+                if key in stock_signals['sell']:
+                    pass
+                else:
+                    stock_data = get_stock_updated_data(symbol, portfolio)
+                    if nlp_enabled:
+                        prediton_value = get_nlp_prediction(symbol)
+                        if prediton_value == 0:
+                            portfolio = sel_specific_stock(portfolio, stock_data)
+                        else:
+                            lod_data = 'skipp selling because prediction value for {} is {}: going lower'.format(symbol, prediton_value)
+                            my_logger.info(lod_data)
+                    else: # nlp not enabled
                         portfolio = sel_specific_stock(portfolio, stock_data)
-                    else:
-                        lod_data = 'skipp selling because prediction value for {} is {}: going lower'.format(symbol, prediton_value)
-                        my_logger.info(lod_data)
-                else: # nlp not enabled
-                    portfolio = sel_specific_stock(portfolio, stock_data)
-                
-                stock_signals['sell'][key] = {'action': True, 'date': str(datetime.now())}
-                
-        
-        # 2- buy process
-        buys_actions = buys.to_dict('records')
-        for action in buys_actions:
-            key = str(action['key'])+'_'+symbol
-            if key in stock_signals['buy']:
-                pass
-            else:
-                stock_data = get_stock_updated_data(symbol, portfolio)
-                if nlp_enabled:
-                    prediton_value = get_nlp_prediction(symbol)
-                    if prediton_value == 1:
-                        portfolio = buy_specific_stock(portfolio, stock_data)
-                    else:
-                        lod_data = 'skipp buying because prediction value for {} is {}: going lower'.format(symbol, prediton_value)                        
-                        my_logger.info(lod_data)
-                else: # nlp disabled
-                    portfolio = buy_specific_stock(portfolio, stock_data)
                     
-                stock_signals['buy'][key] = {'action': True, 'date': str(datetime.now())}
-        
-        # plot for that trading moment
-        # The label parameter is useful for the legend
-        plt.plot(data.index, data['4. close'], label='E-Mini future price')
-        plt.plot(data.index, data['Mavg5'], label='5-steps moving average')
-        plt.plot(data.index, data['Mavg20'], label='20-steps moving average')
-        
-        
-        plt.plot(buys.index, data.ix[buys.index]['4. close'], '^', markersize=10, color='g')
-        plt.plot(sells.index, data.ix[sells.index]['4. close'], 'v', markersize=10, color='r')
-        
-        plt.ylabel('E-Mini future price {}'.format(symbol))
-        plt.xlabel('Date')
-        plt.legend(loc=0)
-        plt.show()
-        time.sleep(5)
-        
+                    stock_signals['sell'][key] = {'action': True, 'date': str(datetime.now())}
+                    
+            
+            # 2- buy process
+            buys_actions = buys.to_dict('records')
+            for action in buys_actions:
+                key = str(action['key'])+'_'+symbol
+                if key in stock_signals['buy']:
+                    pass
+                else:
+                    stock_data = get_stock_updated_data(symbol, portfolio)
+                    if nlp_enabled:
+                        prediton_value = get_nlp_prediction(symbol)
+                        if prediton_value == 1:
+                            portfolio = buy_specific_stock(portfolio, stock_data)
+                        else:
+                            lod_data = 'skipp buying because prediction value for {} is {}: going lower'.format(symbol, prediton_value)                        
+                            my_logger.info(lod_data)
+                    else: # nlp disabled
+                        portfolio = buy_specific_stock(portfolio, stock_data)
+                        
+                    stock_signals['buy'][key] = {'action': True, 'date': str(datetime.now())}
+            
+            # plot for that trading moment
+            # The label parameter is useful for the legend
+            plt.plot(data.index, data['4. close'], label='E-Mini future price')
+            plt.plot(data.index, data['Mavg5'], label='5-steps moving average')
+            plt.plot(data.index, data['Mavg20'], label='20-steps moving average')
+            
+            
+            plt.plot(buys.index, data.ix[buys.index]['4. close'], '^', markersize=10, color='g')
+            plt.plot(sells.index, data.ix[sells.index]['4. close'], 'v', markersize=10, color='r')
+            
+            plt.ylabel('E-Mini future price {}'.format(symbol))
+            plt.xlabel('Date')
+            plt.legend(loc=0)
+            plt.show()
+            time.sleep(1)
+        except Exception as e:
+            print('error on stock: ', symbol, str(e))
+            
     return portfolio
 
 
@@ -296,12 +288,10 @@ if __name__ == "__main__":
     while current_time <= market_end_time:
         portfolio = run_strategy(portfolio, nlp_enabled=True)
         portfolio = process_portfolio_value(portfolio)
-        my_logger.info('datetime: {},protfolio data: {}'.format(datetime.now(), portfolio['value']))        
+        my_logger.info('datetime: {}, protfolio data: {}'.format(datetime.now(), portfolio['value']))        
         time.sleep(api_wait_time)
         current_time = str(datetime.now())
 #        break
-#        time.sleep(60)
-    
     
 
 
