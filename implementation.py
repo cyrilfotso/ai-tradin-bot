@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Apr 29 03:41:13 2020
+Created on Wed Apr 25 03:41:13 2020
 
-@author: c106763
+@author: cfo
 """
 
 # https://www.alphavantage.co/support/#api-key
@@ -281,8 +281,7 @@ def run_strategy(portfolio, nlp_enabled=True):
         plt.xlabel('Date')
         plt.legend(loc=0)
         plt.show()
-        
-        time.sleep(65)
+        time.sleep(5)
         
     return portfolio
 
@@ -293,16 +292,15 @@ if __name__ == "__main__":
     portfolio = buy_stocks(day_list_stocks)
     portfolio = process_portfolio_value(portfolio)
     current_time = str(datetime.now())
-    i = 1
-    j = 0
+
     while current_time <= market_end_time:
-        portfolio = run_strategy(portfolio, nlp_enabled=False)
+        portfolio = run_strategy(portfolio, nlp_enabled=True)
         portfolio = process_portfolio_value(portfolio)
         my_logger.info('datetime: {},protfolio data: {}'.format(datetime.now(), portfolio['value']))        
         time.sleep(api_wait_time)
         current_time = str(datetime.now())
-        j += 1
-        break
+#        break
+#        time.sleep(60)
     
     
 
