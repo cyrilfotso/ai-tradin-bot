@@ -4,7 +4,7 @@
     1. “short” moving average: 5-min
     1. “long” moving average: 20-min
 ![forcast Logo](/images/forcast.png)
-Format: ![forcast image](url)
+
 
 1. NLP to predict real time stock movements (rise | fall)
 
@@ -12,3 +12,4 @@ Format: ![forcast image](url)
 
 1. in-build portfolio management
 
+![portfolio Logo](/portfolio/forcast.png)
