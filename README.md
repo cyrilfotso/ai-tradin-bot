@@ -3,6 +3,8 @@
 1. forcasting to detect trading signals [buy(green) | sell(red)] 
     1. “short” moving average: 5-min
     1. “long” moving average: 20-min
+    
+
 ![forcast Logo](/images/forcast.png)
 
 
@@ -12,4 +14,4 @@
 
 1. in-build portfolio management
 
-![portfolio Logo](/portfolio/forcast.png)
+![portfolio Logo](/images/portfolio.png)
